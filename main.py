@@ -5,7 +5,11 @@ import tkinter as tk
 from tkinter import messagebox
 import mediapipe as mp
 import numpy as np
-from keras.models import load_model
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from keras.utils import to_categorical
+from sklearn.model_selection import train_test_split
+import glob
 
 # Variáveis globais
 gravando = False
@@ -153,12 +157,69 @@ def abrir_janela_escolha():
                            width=20, command=lambda: salvar_video('good'))
     botao_good.pack(pady=5)
 
-# Função para treinar a CNN (placeholder)
+# Função para treinar a CNN
 
 
 def treinar_cnn():
-    messagebox.showinfo(
-        "Info", "Função de treinamento da CNN não implementada ainda.")
+    global modelo_classificacao
+    pasta_videos = os.path.join(os.getcwd(), "videos")
+    video_files = glob.glob(os.path.join(pasta_videos, "*.mp4"))
+
+    frames = []
+    labels = []
+
+    # Extrair frames e labels dos vídeos
+    for video_file in video_files:
+        label = "good posture" if "good_posture" in video_file else "bad posture"
+        capture = cv2.VideoCapture(video_file)
+
+        while True:
+            ret, frame = capture.read()
+            if not ret:
+                break
+            # Redimensionar e normalizar os frames
+            frame = cv2.resize(frame, (64, 64))
+            frames.append(frame)
+            labels.append(label)
+
+        capture.release()
+
+    # Converter listas em arrays numpy
+    frames = np.array(frames, dtype="float32") / 255.0  # Normalizar
+    labels = np.array(labels)
+
+    # Converter labels para uma forma numérica
+    labels = np.where(labels == "good posture", 1,
+                      0)  # 1 para good, 0 para bad
+    labels = to_categorical(labels)
+
+    # Dividir os dados em conjuntos de treino e teste
+    X_train, X_test, y_train, y_test = train_test_split(
+        frames, labels, test_size=0.2, random_state=42)
+
+    # Criar a arquitetura da CNN
+    modelo_classificacao = Sequential()
+    modelo_classificacao.add(
+        Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 3)))
+    modelo_classificacao.add(MaxPooling2D(pool_size=(2, 2)))
+    modelo_classificacao.add(Conv2D(64, (3, 3), activation='relu'))
+    modelo_classificacao.add(MaxPooling2D(pool_size=(2, 2)))
+    modelo_classificacao.add(Flatten())
+    modelo_classificacao.add(Dense(64, activation='relu'))
+    modelo_classificacao.add(Dense(2, activation='softmax'))  # Duas classes
+
+    # Compilar o modelo
+    modelo_classificacao.compile(
+        optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    # Treinar o modelo
+    modelo_classificacao.fit(X_train, y_train, epochs=10,
+                             validation_data=(X_test, y_test))
+
+    # Avaliar o modelo
+    loss, accuracy = modelo_classificacao.evaluate(X_test, y_test)
+    messagebox.showinfo("Treinamento Concluído", f"Loss: {
+                        loss:.4f}\nAcurácia: {accuracy:.4f}")
 
 # Função para testar vídeo em tempo real
 
@@ -187,58 +248,62 @@ def capturar_video():
             if not ret:
                 break
 
+            # Processar o frame para pose estimation
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = pose.process(rgb_frame)
 
+            # Desenhar os landmarks da pose no frame original
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(
                     frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-            # Classificação da postura (placeholder)
-            postura = classificar_postura(frame)
+            # Preparar o frame para classificação
+            resized_frame = cv2.resize(frame, (64, 64))
+            normalized_frame = np.array(resized_frame, dtype="float32") / 255.0
+            input_frame = np.expand_dims(normalized_frame, axis=0)
 
-            # Desenhar o resultado na tela
-            if postura == "good":
-                cv2.rectangle(frame, (10, 10), (630, 100), (0, 255, 0), -1)
-                cv2.putText(frame, "Good Posture", (20, 70),
-                            cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 3)
-            elif postura == "bad":
-                cv2.rectangle(frame, (10, 10), (630, 100), (0, 0, 255), -1)
-                cv2.putText(frame, "Bad Posture", (20, 70),
-                            cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 3)
+            # Realizar a classificação
+            if modelo_classificacao:
+                predictions = modelo_classificacao.predict(input_frame)
+                class_index = np.argmax(predictions[0])
+                if class_index == 1:
+                    cor = (0, 255, 0)  # Verde para good posture
+                    texto = "Good Posture"
+                else:
+                    cor = (0, 0, 255)  # Vermelho para bad posture
+                    texto = "Bad Posture"
 
-            # Mostrar o vídeo em tempo real
+                # Desenhar o retângulo e o texto no frame
+                cv2.rectangle(frame, (10, 10), (300, 50), cor, -1)
+                cv2.putText(frame, texto, (20, 40),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+            # Mostrar o vídeo
             cv2.imshow('Teste de Postura em Tempo Real', frame)
 
+            # Se pressionar ESC, para o teste
             if cv2.waitKey(1) & 0xFF == 27:
                 break
 
     cap.release()
     cv2.destroyAllWindows()
 
-# Função para classificar a postura (placeholder)
-
-
-def classificar_postura(frame):
-    # Aqui você pode adicionar lógica para classificar usando o modelo treinado
-    # Exemplo: retornar "good" ou "bad" com base em uma previsão do modelo
-    return "good" if np.random.rand() > 0.5 else "bad"  # Substitua pela lógica real
-
-# Função para fechar a aplicação
+# Função para fechar a janela
 
 
 def fechar():
-    if gravando:
-        messagebox.showwarning(
-            "Aviso", "Por favor, pare a gravação antes de fechar.")
-    else:
-        janela.destroy()
+    global cap, janela_testar
+    if cap:
+        cap.release()
+    if janela_testar:
+        janela_testar.destroy()
+    janela.destroy()
 
 
-# Configuração da interface gráfica
+# Criar a interface gráfica
 janela = tk.Tk()
-janela.title("Gravar Vídeo")
-janela.geometry("300x300")
+janela.title("Gravação de Vídeo")
+janela.geometry("300x200")
 
 botao_gravar = tk.Button(janela, text="Gravar",
                          width=20, command=iniciar_gravacao)
