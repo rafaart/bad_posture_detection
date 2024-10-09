@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import messagebox
 import mediapipe as mp
 import numpy as np
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
@@ -221,24 +221,60 @@ def treinar_cnn():
     messagebox.showinfo("Treinamento Concluído", f"Loss: {
                         loss:.4f}\nAcurácia: {accuracy:.4f}")
 
+    # Salvar o modelo após o treinamento
+    caminho_modelo = os.path.join(
+        os.getcwd(), "videos", "modelo_classificacao.h5")
+    modelo_classificacao.save(caminho_modelo)
+    messagebox.showinfo("Modelo Salvo", f"Modelo salvo como {
+                        os.path.basename(caminho_modelo)}!")
+
+# Função para carregar o modelo
+
+
+def carregar_modelo():
+    global modelo_classificacao
+    caminho_modelo = os.path.join(
+        os.getcwd(), "videos", "modelo_classificacao.h5")
+
+    if os.path.exists(caminho_modelo):
+        modelo_classificacao = load_model(caminho_modelo)
+        messagebox.showinfo("Modelo Carregado",
+                            "Modelo de classificação carregado com sucesso!")
+    else:
+        messagebox.showerror(
+            "Erro", "Não há um modelo salvo. Use a função 'Treinar CNN' para gerar um novo.")
+
 # Função para testar vídeo em tempo real
 
 
 def testar_video():
     global janela_testar
+    if not os.path.exists(os.path.join(os.getcwd(), "videos", "modelo_classificacao.h5")):
+        messagebox.showerror(
+            "Erro", "Não há um modelo salvo. Use a função 'Treinar CNN' para gerar um novo.")
+        return
+
     if janela_testar is None or not janela_testar.winfo_exists():
         janela_testar = tk.Toplevel()
         janela_testar.title("Teste de Postura")
-        janela_testar.geometry("640x480")
+        janela_testar.geometry("300x150")
+        carregar_modelo()  # Carregar o modelo ao abrir a janela de teste
 
-        # Iniciar a captura de vídeo
-        threading.Thread(target=capturar_video).start()
+        # Botão para iniciar o teste em tempo real
+        botao_iniciar_teste = tk.Button(janela_testar, text="Iniciar Teste", width=20,
+                                        command=lambda: threading.Thread(target=real_time_testing).start())
+        botao_iniciar_teste.pack(pady=5)
 
-# Capturar vídeo e fazer classificação em tempo real
+        # Botão para parar o teste
+        botao_parar_teste = tk.Button(
+            janela_testar, text="Parar Teste", width=20, command=parar_teste)
+        botao_parar_teste.pack(pady=5)
+
+# Função para testar vídeo em tempo real
 
 
-def capturar_video():
-    global cap, modelo_classificacao
+def real_time_testing():
+    global cap
     cap = cv2.VideoCapture(0)
 
     if not cap.isOpened():
@@ -251,8 +287,10 @@ def capturar_video():
             if not ret:
                 break
 
-            # Processar o frame para pose estimation
+            # Converter o frame de BGR para RGB
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Fazer a pose estimation
             results = pose.process(rgb_frame)
 
             # Desenhar os landmarks da pose no frame original
