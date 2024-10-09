@@ -239,17 +239,27 @@ def real_time_testing():
                             janela_video = gw.getWindowsWithTitle(
                                 'Teste de Postura em Tempo Real')[0]
 
-                        # Restaurar a janela (sair do minimizado)
-                        janela_video.restore()
-                        janela_video.activate()
-                        fullscreen_ativado = True
+                        try:
+                            # Restaurar a janela se estiver minimizada
+                            if janela_video.isMinimized:
+                                janela_video.restore()
+                            # Ativar a janela se não estiver ativa
+                            if not janela_video.isActive:
+                                janela_video.activate()
+                            fullscreen_ativado = True
+                        except Exception as e:
+                            print(f"Erro ao ativar/restaurar a janela: {e}")
+
                 else:  # Good Posture
                     if tempo_boa_postura >= 10 and fullscreen_ativado:
                         print("Minimizando janela após 10 segundos de boa postura.")
 
                         # Minimizar a janela
-                        janela_video.minimize()
-                        fullscreen_ativado = False
+                        try:
+                            janela_video.minimize()
+                            fullscreen_ativado = False
+                        except Exception as e:
+                            print(f"Erro ao minimizar a janela: {e}")
 
             # Mostrar o vídeo
             cv2.imshow('Teste de Postura em Tempo Real', frame)
