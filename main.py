@@ -3,6 +3,7 @@ import cv2
 import threading
 import os
 import numpy as np
+import pygetwindow as gw
 import time
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -158,6 +159,12 @@ def real_time_testing():
 
     # Variáveis para rastrear o tempo
     tempo_inicial = time.time()  # Tempo inicial da execução
+    estado_anterior = None  # Variável para armazenar o estado anterior
+    # Flag para verificar se a janela está ativa em primeiro plano
+    fullscreen_ativado = False
+
+    # Obtém a janela de vídeo do OpenCV
+    janela_video = None
 
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         while True:
@@ -186,19 +193,31 @@ def real_time_testing():
                 predictions = modelo_classificacao.predict(input_frame)
                 class_index = np.argmax(predictions[0])
 
+                # Debug: Imprimir estado e contadores
+                print(f"Classificação atual: {class_index} | Tempo má postura: {
+                      tempo_ma_postura} | Tempo boa postura: {tempo_boa_postura}")
+
+                # Se o estado atual for diferente do anterior, resetar contadores
+                if class_index != estado_anterior:
+                    print("Mudança de estado detectada, resetando contador.")
+                    tempo_boa_postura = 0
+                    tempo_ma_postura = 0
+                    tempo_inicial = time.time()  # Resetar o tempo inicial
+
+                # Atualizar o estado anterior
+                estado_anterior = class_index
+
                 # Verifica a classe e atualiza o contador
                 if class_index == 1:
                     cor = (0, 255, 0)  # Verde para good posture
                     texto = "Good Posture"
                     # Contagem em segundos para boa postura
                     tempo_boa_postura = int(time.time() - tempo_inicial)
-                    tempo_ma_postura = 0
                 else:
                     cor = (0, 0, 255)  # Vermelho para bad posture
                     texto = "Bad Posture"
                     # Contagem em segundos para má postura
                     tempo_ma_postura = int(time.time() - tempo_inicial)
-                    tempo_boa_postura = 0
 
                 # Desenhar o retângulo e o texto no frame
                 cv2.rectangle(frame, (10, 10), (300, 50), cor, -1)
@@ -212,16 +231,25 @@ def real_time_testing():
 
                 # Verificar a postura do usuário
                 if class_index == 0:  # Bad Posture
-                    if tempo_ma_postura >= 20:
-                        # Colocar em fullscreen
-                        cv2.setWindowProperty(
-                            'Teste de Postura em Tempo Real', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+                    if tempo_ma_postura >= 10 and not fullscreen_ativado:
+                        print("Restaurando janela por 10 segundos de má postura.")
+
+                        # Obter a janela do OpenCV
+                        if janela_video is None:
+                            janela_video = gw.getWindowsWithTitle(
+                                'Teste de Postura em Tempo Real')[0]
+
+                        # Restaurar a janela (sair do minimizado)
+                        janela_video.restore()
+                        janela_video.activate()
+                        fullscreen_ativado = True
                 else:  # Good Posture
-                    if tempo_boa_postura >= 10:
-                        # Minimizar a janela após 10 segundos em boa postura
-                        cv2.setWindowProperty(
-                            'Teste de Postura em Tempo Real', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
-                        tempo_inicial = time.time()  # Resetar o tempo inicial
+                    if tempo_boa_postura >= 10 and fullscreen_ativado:
+                        print("Minimizando janela após 10 segundos de boa postura.")
+
+                        # Minimizar a janela
+                        janela_video.minimize()
+                        fullscreen_ativado = False
 
             # Mostrar o vídeo
             cv2.imshow('Teste de Postura em Tempo Real', frame)
