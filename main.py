@@ -226,12 +226,15 @@ def treinar_cnn():
 
 def testar_video():
     global janela_testar
-    janela_testar = tk.Toplevel()
-    janela_testar.title("Teste de Postura")
-    janela_testar.geometry("640x480")
+    if janela_testar is None or not janela_testar.winfo_exists():
+        janela_testar = tk.Toplevel()
+        janela_testar.title("Teste de Postura")
+        janela_testar.geometry("640x480")
 
-    # Iniciar a captura de vídeo
-    threading.Thread(target=capturar_video).start()
+        # Iniciar a captura de vídeo
+        threading.Thread(target=capturar_video).start()
+
+# Capturar vídeo e fazer classificação em tempo real
 
 
 def capturar_video():
@@ -257,7 +260,7 @@ def capturar_video():
                 mp_drawing.draw_landmarks(
                     frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-            # Preparar o frame para classificação
+            # Redimensionar o frame para a classificação
             resized_frame = cv2.resize(frame, (64, 64))
             normalized_frame = np.array(resized_frame, dtype="float32") / 255.0
             input_frame = np.expand_dims(normalized_frame, axis=0)
@@ -288,37 +291,47 @@ def capturar_video():
     cap.release()
     cv2.destroyAllWindows()
 
+# Função para parar o teste
+
+
+def parar_teste():
+    global cap
+    if cap:
+        cap.release()
+
 # Função para fechar a janela
 
 
 def fechar():
-    global cap, janela_testar
+    global cap
     if cap:
         cap.release()
-    if janela_testar:
-        janela_testar.destroy()
     janela.destroy()
 
 
 # Criar a interface gráfica
 janela = tk.Tk()
 janela.title("Gravação de Vídeo")
-janela.geometry("300x200")
+janela.geometry("300x250")
 
 botao_gravar = tk.Button(janela, text="Gravar",
                          width=20, command=iniciar_gravacao)
-botao_gravar.pack(pady=10)
+botao_gravar.pack(pady=5)
 
 botao_parar = tk.Button(janela, text="Parar", width=20, command=parar_gravacao)
-botao_parar.pack(pady=10)
+botao_parar.pack(pady=5)
 
 botao_treinar = tk.Button(janela, text="Treinar CNN",
                           width=20, command=treinar_cnn)
-botao_treinar.pack(pady=10)
+botao_treinar.pack(pady=5)
 
 botao_testar = tk.Button(janela, text="Testar Vídeo",
                          width=20, command=testar_video)
-botao_testar.pack(pady=10)
+botao_testar.pack(pady=5)
+
+botao_parar_teste = tk.Button(
+    janela, text="Parar Teste", width=20, command=parar_teste)
+botao_parar_teste.pack(pady=5)
 
 janela.protocol("WM_DELETE_WINDOW", fechar)
 janela.mainloop()
