@@ -161,6 +161,26 @@ def parar_gravacao():
         # Abre a janela para escolher o nome do arquivo
         abrir_janela_escolha()
 
+# Função para abrir a janela de escolha (botões bad/good)
+
+
+def abrir_janela_escolha():
+    global janela_escolha
+    janela_escolha = tk.Toplevel()
+    janela_escolha.title("Escolher nome do vídeo")
+    janela_escolha.geometry("300x150")
+
+    label = tk.Label(janela_escolha, text="Escolha o nome do vídeo:")
+    label.pack(pady=10)
+
+    botao_bad = tk.Button(janela_escolha, text="Bad Posture",
+                          width=20, command=lambda: salvar_video('bad'))
+    botao_bad.pack(pady=5)
+
+    botao_good = tk.Button(janela_escolha, text="Good Posture",
+                           width=20, command=lambda: salvar_video('good'))
+    botao_good.pack(pady=5)
+
 
 def salvar_video():
     global janela_salvar
