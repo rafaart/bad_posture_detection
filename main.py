@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pygetwindow as gw
 import time
+import glob
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
 import mediapipe as mp
@@ -24,20 +25,43 @@ tempo_ma_postura = 0
 tempo_boa_postura = 0
 gravando = False
 out = None
+janela_video = None
 
 # Função para treinar a CNN
 
 
 def treinar_cnn():
-    # Aqui você pode carregar os vídeos gravados e realizar o treinamento
-    frames = []  # Colete os frames dos vídeos aqui
-    labels = []  # Colete os labels correspondentes aos vídeos
+    global modelo_classificacao
+    pasta_videos = os.path.join(os.getcwd(), "videos")
+    video_files = glob.glob(os.path.join(pasta_videos, "*.mp4"))
 
-    # Convertendo os dados e labels em numpy arrays
-    frames = np.array(frames)
+    frames = []
+    labels = []
+
+    # Extrair frames e labels dos vídeos
+    for video_file in video_files:
+        label = "good posture" if "good_posture" in video_file else "bad posture"
+        capture = cv2.VideoCapture(video_file)
+
+        while True:
+            ret, frame = capture.read()
+            if not ret:
+                break
+            # Redimensionar e normalizar os frames
+            frame = cv2.resize(frame, (64, 64))
+            frames.append(frame)
+            labels.append(label)
+
+        capture.release()
+
+    # Converter listas em arrays numpy
+    frames = np.array(frames, dtype="float32") / 255.0  # Normalizar
     labels = np.array(labels)
 
-    labels = to_categorical(labels, num_classes=2)  # One-hot encoding
+    # Converter labels para uma forma numérica
+    labels = np.where(labels == "good posture", 1,
+                      0)  # 1 para good, 0 para bad
+    labels = to_categorical(labels)
 
     # Dividir os dados em treinamento e teste
     X_train, X_test, y_train, y_test = train_test_split(
@@ -149,12 +173,12 @@ def gravar_video():
 def parar_gravacao():
     global gravando, cap, out
 
-    gravando = False
-
     # Liberar a câmera e fechar todas as janelas
     if gravando:
+        gravando = False
         cap.release()
         out.release()
+
         cv2.destroyAllWindows()
         print("Gravação parada")
 
@@ -180,6 +204,7 @@ def abrir_janela_escolha():
     botao_good = tk.Button(janela_escolha, text="Good Posture",
                            width=20, command=lambda: salvar_video('good'))
     botao_good.pack(pady=5)
+
 
 # Função para salvar o vídeo com base na escolha
 
@@ -216,20 +241,6 @@ def adicionar_sufixo_arquivo(caminho_base):
 
     return caminho_final
 
-
-def salvar_como(nome_arquivo):
-    # Adiciona um sufixo numérico ao nome do arquivo se já existir
-    i = 1
-    novo_nome = f"{nome_arquivo}.avi"
-    while os.path.exists(novo_nome):
-        novo_nome = f"{nome_arquivo}_{i}.avi"
-        i += 1
-
-    # Renomeia o arquivo gravado
-    os.rename('video.avi', novo_nome)
-    janela_salvar.destroy()  # Fecha a janela de salvar
-    print(f"Arquivo salvo como {novo_nome}")
-
 # Função para testar vídeo em tempo real
 
 
@@ -245,6 +256,8 @@ def testar_video():
 
     if modelo_classificacao is None:
         return
+    else:
+        messagebox.showerror("Sucess", "Modelo carregado com sucesso.")
 
     # Thread para o teste em tempo real
     threading.Thread(target=real_time_testing).start()
