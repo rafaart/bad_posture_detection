@@ -117,21 +117,33 @@ def iniciar_gravacao():
 
 def gravar_video():
     global gravando, cap, out
+    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+        while gravando:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-    while gravando:
-        ret, frame = cap.read()
-        if ret:
-            # Escrever o frame no arquivo de vídeo
+            # Converter o frame de BGR para RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Fazer a pose estimation
+            results = pose.process(rgb_frame)
+
+            # Desenhar os landmarks da pose no frame original
+            if results.pose_landmarks:
+                mp_drawing.draw_landmarks(
+                    frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+
+            # Escrever o frame com pose no arquivo de vídeo
             out.write(frame)
 
-            # Mostrar o vídeo em tempo real
-            cv2.imshow('Gravando', frame)
+            # Mostrar o vídeo em tempo real com as linhas da pose
+            cv2.imshow('Gravando com Pose Estimation...', frame)
 
-            # Se pressionar a tecla 'q', parar a gravação
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            # Se pressionar ESC, para a gravação
+            if cv2.waitKey(1) & 0xFF == 27:
+                parar_gravacao()
                 break
-        else:
-            break
 
 
 def parar_gravacao():
@@ -147,7 +159,7 @@ def parar_gravacao():
         print("Gravação parada")
 
         # Abre a janela para escolher o nome do arquivo
-        salvar_video()
+        abrir_janela_escolha()
 
 
 def salvar_video():
