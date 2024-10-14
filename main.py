@@ -82,24 +82,36 @@ def carregar_modelo():
 # Função para iniciar a gravação de vídeo
 
 
+# Função para iniciar a gravação
 def iniciar_gravacao():
     global gravando, cap, out
+    gravando = True
 
-    # Acessar a webcam
+    # Abrir webcam
     cap = cv2.VideoCapture(0)
 
-    # Verificar se a webcam foi acessada corretamente
     if not cap.isOpened():
         messagebox.showerror("Erro", "Não foi possível acessar a câmera.")
         return
 
-    # Definir o codec e criar o objeto de gravação de vídeo
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter('output.avi', fourcc, 20.0, (640, 480))
+    # Resolução da câmera
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
 
-    gravando = True
+    # Caminho temporário para gravar o vídeo
+    pasta_destino = os.path.join(os.getcwd(), "videos")
+    if not os.path.exists(pasta_destino):
+        os.makedirs(pasta_destino)
 
-    # Thread para gravar o vídeo
+    # Nome temporário para o arquivo
+    caminho_temp = os.path.join(pasta_destino, "gravacao_temp.mp4")
+
+    # Definir o codec e criar o objeto VideoWriter
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec para o formato mp4
+    out = cv2.VideoWriter(caminho_temp, fourcc, 20.0,
+                          (frame_width, frame_height))
+
+    # Thread para gravar o vídeo com pose estimation
     threading.Thread(target=gravar_video).start()
 
 
@@ -128,9 +140,39 @@ def parar_gravacao():
     gravando = False
 
     # Liberar a câmera e fechar todas as janelas
-    cap.release()
-    out.release()
-    cv2.destroyAllWindows()
+    if gravando:
+        cap.release()
+        out.release()
+        cv2.destroyAllWindows()
+        print("Gravação parada")
+
+        # Abre a janela para escolher o nome do arquivo
+        salvar_video()
+
+
+def salvar_video():
+    global janela_salvar
+
+    # Cria uma nova janela para salvar o arquivo
+    janela_salvar = Toplevel(root)
+    janela_salvar.title("Salvar Vídeo")
+
+    # Label para instruir o usuário
+    Label(janela_salvar, text="Salvar o arquivo como:").pack(pady=10)
+
+
+def salvar_como(nome_arquivo):
+    # Adiciona um sufixo numérico ao nome do arquivo se já existir
+    i = 1
+    novo_nome = f"{nome_arquivo}.avi"
+    while os.path.exists(novo_nome):
+        novo_nome = f"{nome_arquivo}_{i}.avi"
+        i += 1
+
+    # Renomeia o arquivo gravado
+    os.rename('video.avi', novo_nome)
+    janela_salvar.destroy()  # Fecha a janela de salvar
+    print(f"Arquivo salvo como {novo_nome}")
 
 # Função para testar vídeo em tempo real
 
