@@ -181,16 +181,40 @@ def abrir_janela_escolha():
                            width=20, command=lambda: salvar_video('good'))
     botao_good.pack(pady=5)
 
+# Função para salvar o vídeo com base na escolha
 
-def salvar_video():
-    global janela_salvar
 
-    # Cria uma nova janela para salvar o arquivo
-    janela_salvar = Toplevel(root)
-    janela_salvar.title("Salvar Vídeo")
+def salvar_video(escolha):
+    pasta_destino = os.path.join(os.getcwd(), "videos")
+    caminho_temp = os.path.join(pasta_destino, "gravacao_temp.mp4")
 
-    # Label para instruir o usuário
-    Label(janela_salvar, text="Salvar o arquivo como:").pack(pady=10)
+    if escolha == 'bad':
+        nome_base = os.path.join(pasta_destino, "bad_posture")
+    elif escolha == 'good':
+        nome_base = os.path.join(pasta_destino, "good_posture")
+    else:
+        return
+
+    # Gerar caminho final com sufixo se necessário
+    caminho_final = adicionar_sufixo_arquivo(nome_base)
+
+    # Renomear o arquivo temporário
+    os.rename(caminho_temp, caminho_final)
+    messagebox.showinfo("Info", f"Gravação salva como {
+                        os.path.basename(caminho_final)}!")
+
+# Função para adicionar um sufixo numérico se o arquivo já existir
+
+
+def adicionar_sufixo_arquivo(caminho_base):
+    sufixo = 1
+    caminho_final = caminho_base + ".mp4"
+
+    while os.path.exists(caminho_final):
+        caminho_final = f"{caminho_base}_{sufixo}.mp4"
+        sufixo += 1
+
+    return caminho_final
 
 
 def salvar_como(nome_arquivo):
